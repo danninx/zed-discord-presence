@@ -37,6 +37,9 @@ pub fn get_language(document: &Document) -> String {
         .get_filename()
         .unwrap_or_else(|_| "unknown".to_string());
     let extension = format!(".{}", document.get_extension());
+    let relative_path = document
+        .get_relative_file_path()
+        .unwrap_or_else(|_| "unknown".to_string());
 
     if let Some(s) = map.get(&filename) {
         return s.clone();
@@ -52,7 +55,7 @@ pub fn get_language(document: &Document) -> String {
             .case_insensitive(true)
             .build()
         {
-            if re.is_match(&filename) || re.is_match(&extension) {
+            if re.is_match(&filename) || re.is_match(&extension) || re.is_match(&relative_path) {
                 return language.clone();
             }
         }
