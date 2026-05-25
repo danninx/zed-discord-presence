@@ -68,14 +68,14 @@ impl Backend {
         }
     }
 
-    async fn on_change(&self, uri: &tower_lsp::lsp_types::Url, line_number: Option<u32>) {
+    async fn on_change(&self, uri: &tower_lsp::lsp_types::Url, line_number: Option<u32>, language_id: String) {
         debug!("Document changed");
 
         let doc = {
             let workspace = self.app_state.workspace.lock().await;
             let workspace_path = Path::new(workspace.path().unwrap_or(""));
 
-            Document::new(uri, workspace_path, line_number)
+            Document::new(uri, workspace_path, line_number, language_id)
         };
 
         if let Err(e) = self.presence_service.update_presence(Some(doc)).await {
@@ -260,26 +260,45 @@ impl LanguageServer for Backend {
     #[instrument(skip(self, params))]
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         debug!("Document opened: {}", params.text_document.uri);
-        self.on_change(&params.text_document.uri, None).await;
+
+        let uri = params.text_document.uri.clone();
+        let language_id = params.text_document.language_id.clone();
+        let mut language_cache = self.app_state.document_languages.lock().await;
+        language_cache.insert(uri.clone(), language_id.clone());
+        
+        self.on_change(&uri, None, language_id).await;
     }
 
     #[instrument(skip(self, params))]
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         debug!("Document changed: {}", params.text_document.uri);
 
+        let uri = &params.text_document.uri;
         let line_number = params
             .content_changes
             .last()
             .and_then(|change| change.range.as_ref())
             .map(|range| range.start.line);
 
-        self.on_change(&params.text_document.uri, line_number).await;
+        let language_id = {
+            let language_cache = self.app_state.document_languages.lock().await;
+            language_cache.get(uri).cloned().unwrap_or_default()
+        };
+
+        self.on_change(uri, line_number, language_id).await;
     }
 
     #[instrument(skip(self, params))]
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
         debug!("Document saved: {}", params.text_document.uri);
-        self.on_change(&params.text_document.uri, None).await;
+
+        let uri = &params.text_document.uri;
+        let language_id = {
+            let language_cache = self.app_state.document_languages.lock().await;
+            language_cache.get(uri).cloned().unwrap_or_default()
+        };
+
+        self.on_change(uri, None, language_id).await;
     }
 
     #[instrument(skip(self, params))]
@@ -291,8 +310,15 @@ impl LanguageServer for Backend {
             "Document highlight requested: {}",
             params.text_document_position_params.text_document.uri
         );
+
         let pos = params.text_document_position_params;
-        self.on_change(&pos.text_document.uri, Some(pos.position.line))
+        let uri = &pos.text_document.uri;
+        let language_id = {
+            let language_cache = self.app_state.document_languages.lock().await;
+            language_cache.get(uri).cloned().unwrap_or_default()
+        };
+
+        self.on_change(uri, Some(pos.position.line), language_id)
             .await;
 
         Ok(None)

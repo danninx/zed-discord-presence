@@ -33,39 +33,45 @@ static LANGUAGE_MAP: LazyLock<Mutex<HashMap<String, String>>> = LazyLock::new(||
 pub fn get_language(document: &Document) -> String {
     let map = LANGUAGE_MAP.lock().unwrap();
 
-    let filename = document
-        .get_filename()
-        .unwrap_or_else(|_| "unknown".to_string());
-    let extension = format!(".{}", document.get_extension());
-    let relative_path = document
-        .get_relative_file_path()
-        .unwrap_or_else(|_| "unknown".to_string());
+    let language_id = document.get_language_id();
+    if language_id != "Unknown" {
+        return language_id;
+    } else {
+        let filename = document
+            .get_filename()
+            .unwrap_or_else(|_| "unknown".to_string());
+        let extension = format!(".{}", document.get_extension());
+        let relative_path = document
+            .get_relative_file_path()
+            .unwrap_or_else(|_| "unknown".to_string());
 
-    if let Some(s) = map.get(&filename) {
-        return s.clone();
-    }
-
-    for (pattern, language) in map.iter() {
-        let pattern = pattern.strip_prefix("regex:");
-        if pattern.is_none() {
-            continue;
+        if let Some(s) = map.get(&filename) {
+            return s.clone();
         }
 
-        if let Ok(re) = RegexBuilder::new(pattern.unwrap())
-            .case_insensitive(true)
-            .build()
-        {
-            if re.is_match(&filename) || re.is_match(&extension) || re.is_match(&relative_path) {
-                return language.clone();
+        for (pattern, language) in map.iter() {
+            let pattern = pattern.strip_prefix("regex:");
+            if pattern.is_none() {
+                continue;
+            }
+
+            if let Ok(re) = RegexBuilder::new(pattern.unwrap())
+                .case_insensitive(true)
+                .build()
+            {
+                if re.is_match(&filename) || re.is_match(&extension) || re.is_match(&relative_path) {
+                    return language.clone();
+                }
             }
         }
+
+        if let Some(s) = map.get(&extension) {
+            return s.clone();
+        }
+
+        String::from("text")
     }
 
-    if let Some(s) = map.get(&extension) {
-        return s.clone();
-    }
-
-    String::from("text")
 }
 
 #[cfg(test)]
@@ -80,8 +86,15 @@ mod tests {
     fn test_unicode_perl() {
         let url = Url::parse("file:///home/user/project/file.php").unwrap();
         let workspace_root = Path::new("/home/user/project");
+        let language_id = String::new();
 
-        let document = Document::new(&url, workspace_root, None);
+        let document = Document::new(
+            &url, 
+            workspace_root, 
+            None, 
+            language_id
+        );
+
         let lang = get_language(&document);
         assert_eq!(lang, "php");
     }

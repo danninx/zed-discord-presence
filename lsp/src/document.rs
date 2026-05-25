@@ -27,17 +27,23 @@ pub struct Document {
     path: PathBuf,
     workspace_root: PathBuf,
     line_number: Option<u32>,
+    language_id: String
 }
 
 impl Document {
-    pub fn new(url: &Url, workspace_root: &Path, line_number: Option<u32>) -> Self {
+    pub fn new(url: &Url, workspace_root: &Path, line_number: Option<u32>, language_id: String) -> Self {
         Self {
             path: url
                 .to_file_path()
                 .unwrap_or_else(|()| PathBuf::from(url.path())),
             workspace_root: workspace_root.to_owned(),
             line_number,
+            language_id,
         }
+    }
+
+    pub fn get_language_id(&self) -> String {
+        self.language_id.clone()
     }
 
     pub fn get_line_number(&self) -> Option<u32> {
@@ -153,7 +159,7 @@ mod tests {
         let workspace_root = workspace_root();
         let file_path = workspace_root.join("src").join("test.rs");
         let url = Url::from_file_path(&file_path).unwrap();
-        let doc = Document::new(&url, &workspace_root, None);
+        let doc = Document::new(&url, &workspace_root, None, String::from("rust"));
 
         assert_eq!(doc.get_filename().unwrap(), "test.rs");
         assert_eq!(doc.get_extension(), "rs");
@@ -171,7 +177,7 @@ mod tests {
         let workspace_root = workspace_root();
         let file_path = workspace_root.join("test file.rs");
         let url = Url::from_file_path(&file_path).unwrap();
-        let doc = Document::new(&url, &workspace_root, None);
+        let doc = Document::new(&url, &workspace_root, None, String::from("rust"));
 
         assert_eq!(doc.get_filename().unwrap(), "test file.rs");
     }

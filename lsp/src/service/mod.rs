@@ -29,6 +29,8 @@ use std::sync::{
     Arc,
 };
 use tokio::sync::Mutex;
+use std::collections::HashMap;
+use tower_lsp::lsp_types::Url;
 
 #[derive(Debug)]
 pub struct AppState {
@@ -39,6 +41,7 @@ pub struct AppState {
     pub git_branch: Arc<Mutex<Option<String>>>,
     pub last_document: Arc<Mutex<Option<Document>>>,
     pub shutting_down: Arc<AtomicBool>,
+    pub document_languages: tokio::sync::Mutex<HashMap<Url, String>>
 }
 
 impl AppState {
@@ -53,6 +56,7 @@ impl AppState {
             git_branch: Arc::new(Mutex::new(None)),
             last_document: Arc::new(Mutex::new(None)),
             shutting_down,
+            document_languages: tokio::sync::Mutex::new(HashMap::new()),
         }
     }
 
